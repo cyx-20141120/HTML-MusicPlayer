@@ -23,7 +23,6 @@ English version: [README.md](README.md)
 ```text
 .
 ├─ html/
-│  ├─ ball.html
 │  └─ HTML-MusicPlayer-Zh-cn.html
 ├─ README.md
 └─ README.zh-CN.md
@@ -32,7 +31,7 @@ English version: [README.md](README.md)
 ## 快速开始
 
 1. 克隆仓库到本地。
-2. 使用浏览器打开 `html/ball.html`。
+2. 使用浏览器打开 `html/HTML-MusicPlayer-Zh-cn.html`。
 3. 建议浏览器：Chrome / Edge 最新版。
 
 无需安装依赖，无需构建。
@@ -58,3 +57,4 @@ English version: [README.md](README.md)
 ## 许可证
 
 可按需补充许可证（例如 MIT）。
+
