@@ -23,7 +23,6 @@ A browser-based MP3 visual player with a centered rotating disc, circular colorf
 ```text
 .
 ├─ html/
-│  ├─ ball.html
 │  └─ HTML-MusicPlayer-Zh-cn.html
 ├─ README.md
 └─ README.zh-CN.md
@@ -58,3 +57,4 @@ No build tools or dependencies are required.
 ## License
 
 Add your preferred license (for example, MIT).
+
