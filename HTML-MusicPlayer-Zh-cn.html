@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liquid Glass MP3 Player</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "SF Pro Display", "Segoe UI", "PingFang SC", sans-serif;
+      background: radial-gradient(circle at 20% 18%, #213861 0%, #14213f 38%, #0b1327 100%);
+    }
+
+    .stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      isolation: isolate;
+    }
+
+    #visualizer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .center-wrap {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: var(--disc-size, 420px);
+      height: var(--disc-size, 420px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .mp3-disc {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      position: relative;
+      animation: spin 8s linear infinite;
+      box-shadow:
+        inset 0 0 28px rgba(255, 255, 255, 0.14),
+        inset 0 0 76px rgba(255, 255, 255, 0.08),
+        0 22px 50px rgba(0, 0, 0, 0.42),
+        0 0 48px rgba(90, 170, 255, 0.24);
+      background:
+        radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.05) 24%, rgba(0, 0, 0, 0.10) 62%, rgba(0, 0, 0, 0.34) 100%),
+        conic-gradient(from 0deg, #45d0ff 0deg, #5f7bff 72deg, #bc51ff 144deg, #ff5693 216deg, #ff9b47 288deg, #45d0ff 360deg);
+      opacity: var(--disc-opacity, 1);
+    }
+
+    .mp3-disc::before {
+      content: "";
+      position: absolute;
+      inset: 11.5%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.06) 48%, rgba(0, 0, 0, 0.23));
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.12);
+    }
+
+    .disc-art {
+      position: absolute;
+      inset: 18%;
+      width: 64%;
+      height: 64%;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.42);
+      box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.16), 0 0 16px rgba(120, 200, 255, 0.30);
+      z-index: 2;
+      display: none;
+    }
+
+    .disc-label {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #f2f7ff;
+      text-shadow: 0 0 14px rgba(90, 170, 255, 0.5);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .disc-label .note {
+      font-size: clamp(42px, 7vw, 74px);
+      line-height: 1;
+      margin-bottom: 2px;
+      font-weight: 700;
+    }
+
+    .disc-label .text {
+      font-size: clamp(16px, 2vw, 24px);
+      letter-spacing: 0.16em;
+      font-weight: 600;
+    }
+
+    .control-panel {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 20;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      max-width: min(96vw, 860px);
+      padding: 12px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.10),
+        0 12px 28px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(16px) saturate(165%);
+      -webkit-backdrop-filter: blur(16px) saturate(165%);
+    }
+
+    .control-panel.hidden { display: none; }
+
+    .liquid-btn {
+      border: 1px solid rgba(255, 255, 255, 0.40);
+      border-radius: 14px;
+      padding: 8px 14px;
+      color: #f5f9ff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(160deg, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0.06));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.12),
+        0 6px 14px rgba(0, 0, 0, 0.22);
+      transition: transform 0.16s ease, filter 0.16s ease, background 0.16s ease;
+    }
+
+    .liquid-btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+      background: linear-gradient(160deg, rgba(255, 255, 255, 0.40), rgba(255, 255, 255, 0.10));
+    }
+
+    .liquid-btn:active {
+      transform: translateY(0);
+      filter: brightness(0.98);
+    }
+
+    .liquid-btn:disabled {
+      cursor: not-allowed;
+      filter: grayscale(0.3) brightness(0.85);
+      transform: none;
+    }
+
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.30);
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.05));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+      color: rgba(246, 251, 255, 0.95);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .liquid-slider {
+      appearance: none;
+      width: 150px;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(130, 220, 255, 0.92), rgba(255, 120, 230, 0.92));
+      outline: none;
+      box-shadow: 0 0 10px rgba(120, 200, 255, 0.35);
+    }
+
+    .liquid-slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.62);
+      background: linear-gradient(165deg, rgba(255, 255, 255, 0.95), rgba(200, 225, 255, 0.86));
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+    }
+
+    .liquid-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.62);
+      background: linear-gradient(165deg, rgba(255, 255, 255, 0.95), rgba(200, 225, 255, 0.86));
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+    }
+
+    .status {
+      color: rgba(246, 251, 255, 0.96);
+      font-size: 12px;
+      white-space: nowrap;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.28);
+    }
+
+    .hidden-input { display: none; }
+
+    .show-panel-btn {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 25;
+      display: none;
+    }
+
+    .show-panel-btn.visible { display: inline-block; }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <canvas id="visualizer"></canvas>
+    <div class="center-wrap" id="centerWrap">
+      <div class="mp3-disc" id="mp3Disc">
+        <img id="discArt" class="disc-art" alt="music icon">
+        <div class="disc-label" id="discLabel">
+          <div class="note">&#9835;</div>
+          <div class="text">MP3</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="control-panel">
+    <button id="langToggleBtn" class="liquid-btn" type="button">Language: 中文</button>
+    <button id="hidePanelBtn" class="liquid-btn" type="button">隐藏控制面板</button>
+    <button id="pickMp3Btn" class="liquid-btn" type="button">选择 MP3</button>
+    <button id="pickBgBtn" class="liquid-btn" type="button">选择背景图</button>
+    <button id="pickIconBtn" class="liquid-btn" type="button">选择音乐图标</button>
+    <button id="applyConfigBtn" class="liquid-btn" type="button">配置完成</button>
+    <button id="startBtn" class="liquid-btn" type="button" disabled>开始</button>
+    <button id="pauseBtn" class="liquid-btn" type="button" disabled>暂停</button>
+    <label class="slider-group">
+      <span id="opacityLabel">图标透明度</span>
+      <input id="opacitySlider" class="liquid-slider" type="range" min="20" max="100" value="100">
+    </label>
+    <span id="configStatus" class="status">配置状态: 待完成</span>
+    <span id="musicStatus" class="status">音乐: 未选择</span>
+    <span id="bgStatus" class="status">背景: 默认</span>
+    <input id="mp3Input" class="hidden-input" type="file" accept=".mp3,audio/mpeg">
+    <input id="bgInput" class="hidden-input" type="file" accept="image/*">
+    <input id="iconInput" class="hidden-input" type="file" accept="image/*">
+  </div>
+  <button id="showPanelBtn" class="liquid-btn show-panel-btn" type="button">显示控制面板</button>
+
+  <script>
+    const I18N = {
+      zh: {
+        langButton: "Language: 中文",
+        hidePanel: "隐藏控制面板",
+        showPanel: "显示控制面板",
+        pickMp3: "选择 MP3",
+        pickBg: "选择背景图",
+        pickIcon: "选择音乐图标",
+        applyConfig: "配置完成",
+        start: "开始",
+        pause: "暂停",
+        opacity: "图标透明度",
+        cfgPending: "配置状态: 待完成",
+        cfgLocked: "配置状态: 已锁定",
+        cfgComplete: "配置状态: 已完成",
+        cfgNeedMp3: "配置状态: 请先选择 MP3",
+        cfgNeedComplete: "配置状态: 请先点击配置完成",
+        cfgInvalidIcon: "配置状态: 图标文件无效",
+        musicNotSelected: "音乐: 未选择",
+        musicInvalid: "音乐: 文件无效",
+        musicReady: (name) => `音乐: ${name}（已就绪）`,
+        musicPlaying: (name) => `音乐: 播放中 ${name}`,
+        musicPaused: (name) => name ? `音乐: 已暂停 ${name}` : "音乐: 已暂停",
+        musicRetry: "音乐: 请先点击页面后重试",
+        bgDefault: "背景: 默认",
+        bgInvalid: "背景: 图片文件无效",
+        bgSelected: (name) => `背景: ${name}`
+      },
+      en: {
+        langButton: "Language: English",
+        hidePanel: "Hide Panel",
+        showPanel: "Show Panel",
+        pickMp3: "Select MP3",
+        pickBg: "Select Background",
+        pickIcon: "Select Icon",
+        applyConfig: "Config Complete",
+        start: "Start",
+        pause: "Pause",
+        opacity: "Icon Opacity",
+        cfgPending: "Config: Pending",
+        cfgLocked: "Config: Locked",
+        cfgComplete: "Config: Complete",
+        cfgNeedMp3: "Config: Select MP3 first",
+        cfgNeedComplete: "Config: Click Config Complete first",
+        cfgInvalidIcon: "Config: Invalid icon",
+        musicNotSelected: "Music: Not selected",
+        musicInvalid: "Music: Invalid file",
+        musicReady: (name) => `Music: ${name} (ready)`,
+        musicPlaying: (name) => `Music: Playing ${name}`,
+        musicPaused: (name) => name ? `Music: Paused ${name}` : "Music: Paused",
+        musicRetry: "Music: Click page and retry",
+        bgDefault: "BG: Default",
+        bgInvalid: "BG: Invalid image",
+        bgSelected: (name) => `BG: ${name}`
+      }
+    };
+
+    const CM_TO_PX = 35;
+    const BALL_DIAMETER_CM = 0.5;
+    const RING_DIAMETER_CM = 12;
+    const BALL_RADIUS_PX = BALL_DIAMETER_CM * CM_TO_PX / 2;
+    const RING_RADIUS_PX = RING_DIAMETER_CM * CM_TO_PX / 2;
+    const RING_THICKNESS_PX = BALL_RADIUS_PX * 2.2;
+    const EXTRA_RING_COUNT = 2;
+    const RING_RADIUS_STEP_PX = 3 * (BALL_RADIUS_PX * 2);
+    const OUTER_RADIUS_PX = RING_RADIUS_PX + EXTRA_RING_COUNT * RING_RADIUS_STEP_PX;
+    const ORIGINAL_SYSTEM_DIAMETER_PX = 2 * (OUTER_RADIUS_PX + RING_THICKNESS_PX / 2);
+
+    const centerWrap = document.getElementById("centerWrap");
+    const mp3Disc = document.getElementById("mp3Disc");
+    const discArt = document.getElementById("discArt");
+    const discLabel = document.getElementById("discLabel");
+    const canvas = document.getElementById("visualizer");
+    const ctx = canvas.getContext("2d");
+
+    const controlPanel = document.querySelector(".control-panel");
+    const langToggleBtn = document.getElementById("langToggleBtn");
+    const hidePanelBtn = document.getElementById("hidePanelBtn");
+    const showPanelBtn = document.getElementById("showPanelBtn");
+    const pickMp3Btn = document.getElementById("pickMp3Btn");
+    const pickBgBtn = document.getElementById("pickBgBtn");
+    const pickIconBtn = document.getElementById("pickIconBtn");
+    const applyConfigBtn = document.getElementById("applyConfigBtn");
+    const startBtn = document.getElementById("startBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const opacityLabel = document.getElementById("opacityLabel");
+    const opacitySlider = document.getElementById("opacitySlider");
+    const mp3Input = document.getElementById("mp3Input");
+    const bgInput = document.getElementById("bgInput");
+    const iconInput = document.getElementById("iconInput");
+    const configStatus = document.getElementById("configStatus");
+    const musicStatus = document.getElementById("musicStatus");
+    const bgStatus = document.getElementById("bgStatus");
+
+    const audio = new Audio();
+    audio.loop = true;
+    audio.preload = "auto";
+    audio.volume = 0.72;
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = AudioCtx ? new AudioCtx() : null;
+    const analyser = audioCtx ? audioCtx.createAnalyser() : null;
+    if (analyser) {
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.82;
+    }
+    const fftData = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
+    let sourceNode = null;
+
+    let currentLang = "zh";
+    let mp3ObjectUrl = "";
+    let bgObjectUrl = "";
+    let iconObjectUrl = "";
+    let selectedMp3Name = "";
+    let selectedBgName = "";
+    let configLocked = false;
+    let configStatusKey = "cfgPending";
+    let musicStatusKey = "musicNotSelected";
+    let bgStatusKey = "bgDefault";
+
+    function tr(key, ...args) {
+      const entry = I18N[currentLang][key];
+      return typeof entry === "function" ? entry(...args) : entry;
+    }
+
+    function refreshStaticTexts() {
+      document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+      langToggleBtn.textContent = tr("langButton");
+      hidePanelBtn.textContent = tr("hidePanel");
+      showPanelBtn.textContent = tr("showPanel");
+      pickMp3Btn.textContent = tr("pickMp3");
+      pickBgBtn.textContent = tr("pickBg");
+      pickIconBtn.textContent = tr("pickIcon");
+      applyConfigBtn.textContent = tr("applyConfig");
+      startBtn.textContent = tr("start");
+      pauseBtn.textContent = tr("pause");
+      opacityLabel.textContent = tr("opacity");
+    }
+
+    function refreshStatusTexts() {
+      if (configStatusKey === "cfgComplete" && !configLocked) {
+        configStatus.textContent = tr("cfgPending");
+      } else {
+        configStatus.textContent = tr(configStatusKey);
+      }
+
+      if (musicStatusKey === "musicReady") {
+        musicStatus.textContent = tr("musicReady", selectedMp3Name);
+      } else if (musicStatusKey === "musicPlaying") {
+        musicStatus.textContent = tr("musicPlaying", selectedMp3Name);
+      } else if (musicStatusKey === "musicPaused") {
+        musicStatus.textContent = tr("musicPaused", selectedMp3Name);
+      } else {
+        musicStatus.textContent = tr(musicStatusKey);
+      }
+
+      if (bgStatusKey === "bgSelected") {
+        bgStatus.textContent = tr("bgSelected", selectedBgName);
+      } else {
+        bgStatus.textContent = tr(bgStatusKey);
+      }
+    }
+
+    function applyLanguage() {
+      refreshStaticTexts();
+      refreshStatusTexts();
+    }
+
+    function toggleLanguage() {
+      currentLang = currentLang === "zh" ? "en" : "zh";
+      applyLanguage();
+    }
+
+    function resize() {
+      const maxByViewport = Math.min(window.innerWidth, window.innerHeight) * 0.84;
+      const size = Math.max(220, Math.min(ORIGINAL_SYSTEM_DIAMETER_PX, maxByViewport));
+      centerWrap.style.setProperty("--disc-size", `${size}px`);
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    function getDiscMetrics() {
+      const rect = centerWrap.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        radius: rect.width / 2
+      };
+    }
+
+    function ensureAudioGraph() {
+      if (!audioCtx || !analyser || sourceNode) return;
+      sourceNode = audioCtx.createMediaElementSource(audio);
+      sourceNode.connect(analyser);
+      analyser.connect(audioCtx.destination);
+    }
+
+    async function ensureAudioContextRunning() {
+      if (!audioCtx || audioCtx.state === "running") return;
+      try { await audioCtx.resume(); } catch (_) {}
+    }
+
+    function setDiscOpacityFromSlider() {
+      mp3Disc.style.setProperty("--disc-opacity", `${Number(opacitySlider.value) / 100}`);
+    }
+
+    function openMp3Picker() { mp3Input.click(); }
+    function openBgPicker() { bgInput.click(); }
+    function openIconPicker() { iconInput.click(); }
+
+    function updateConfigState() {
+      startBtn.disabled = !configLocked;
+      pauseBtn.disabled = !configLocked;
+      if (configLocked) configStatusKey = "cfgLocked";
+      if (!configLocked && configStatusKey === "cfgLocked") configStatusKey = "cfgPending";
+      refreshStatusTexts();
+    }
+
+    function onMp3Selected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      if (!file.type.includes("audio") && !file.name.toLowerCase().endsWith(".mp3")) {
+        musicStatusKey = "musicInvalid";
+        refreshStatusTexts();
+        return;
+      }
+
+      if (mp3ObjectUrl) URL.revokeObjectURL(mp3ObjectUrl);
+      mp3ObjectUrl = URL.createObjectURL(file);
+      selectedMp3Name = file.name;
+      audio.src = mp3ObjectUrl;
+      audio.currentTime = 0;
+
+      configLocked = false;
+      configStatusKey = "cfgPending";
+      musicStatusKey = "musicReady";
+      updateConfigState();
+      mp3Input.value = "";
+    }
+
+    function onBgSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      if (!file.type.includes("image")) {
+        bgStatusKey = "bgInvalid";
+        refreshStatusTexts();
+        return;
+      }
+
+      if (bgObjectUrl) URL.revokeObjectURL(bgObjectUrl);
+      bgObjectUrl = URL.createObjectURL(file);
+      selectedBgName = file.name;
+      document.body.style.backgroundImage =
+        `linear-gradient(rgba(8, 15, 30, 0.34), rgba(8, 15, 30, 0.56)), url("${bgObjectUrl}")`;
+      document.body.style.backgroundSize = "cover";
+      document.body.style.backgroundPosition = "center";
+      document.body.style.backgroundRepeat = "no-repeat";
+
+      bgStatusKey = "bgSelected";
+      configLocked = false;
+      configStatusKey = "cfgPending";
+      updateConfigState();
+      bgInput.value = "";
+    }
+
+    function onIconSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      if (!file.type.includes("image")) {
+        configStatusKey = "cfgInvalidIcon";
+        refreshStatusTexts();
+        return;
+      }
+
+      if (iconObjectUrl) URL.revokeObjectURL(iconObjectUrl);
+      iconObjectUrl = URL.createObjectURL(file);
+      discArt.src = iconObjectUrl;
+      discArt.style.display = "block";
+      discLabel.style.display = "none";
+
+      configLocked = false;
+      configStatusKey = "cfgPending";
+      updateConfigState();
+      iconInput.value = "";
+    }
+
+    function applyConfig() {
+      if (!audio.src) {
+        configStatusKey = "cfgNeedMp3";
+        refreshStatusTexts();
+        return;
+      }
+      configLocked = true;
+      configStatusKey = "cfgComplete";
+      updateConfigState();
+    }
+
+    async function startPlayback() {
+      if (!configLocked) {
+        configStatusKey = "cfgNeedComplete";
+        refreshStatusTexts();
+        return;
+      }
+      if (!audio.src) {
+        musicStatusKey = "musicNotSelected";
+        refreshStatusTexts();
+        return;
+      }
+
+      await ensureAudioContextRunning();
+      ensureAudioGraph();
+
+      try {
+        await audio.play();
+        musicStatusKey = "musicPlaying";
+      } catch (_) {
+        musicStatusKey = "musicRetry";
+      }
+      refreshStatusTexts();
+    }
+
+    function pausePlayback() {
+      audio.pause();
+      musicStatusKey = "musicPaused";
+      refreshStatusTexts();
+    }
+
+    function drawMusicRing() {
+      const now = performance.now();
+      const { x, y, radius } = getDiscMetrics();
+      const bars = 170;
+      const baseR = radius + 12;
+      const maxOut = Math.max(20, radius * 0.19);
+
+      if (analyser && fftData) analyser.getByteFrequencyData(fftData);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+
+      for (let i = 0; i < bars; i += 1) {
+        const angle = (i / bars) * Math.PI * 2 + now * 0.00022;
+        let amp;
+
+        if (fftData && fftData.length > 0 && !audio.paused) {
+          const idx = Math.floor((i / bars) * fftData.length);
+          amp = fftData[idx] / 255;
+        } else {
+          amp = 0.14 + 0.08 * Math.sin(now * 0.005 + i * 0.33);
+        }
+
+        const inner = baseR;
+        const outer = baseR + 1.5 + amp * maxOut;
+        const x0 = x + Math.cos(angle) * inner;
+        const y0 = y + Math.sin(angle) * inner;
+        const x1 = x + Math.cos(angle) * outer;
+        const y1 = y + Math.sin(angle) * outer;
+        const hue = (now * 0.12 + i * 8.4) % 360;
+        const alpha = 0.5 + amp * 0.44;
+
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineWidth = 2.1;
+        ctx.strokeStyle = `hsla(${hue}, 98%, 64%, ${alpha})`;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = `hsla(${hue}, 100%, 65%, 0.92)`;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.restore();
+      requestAnimationFrame(drawMusicRing);
+    }
+
+    function hideControlPanel() {
+      controlPanel.classList.add("hidden");
+      showPanelBtn.classList.add("visible");
+    }
+
+    function showControlPanel() {
+      controlPanel.classList.remove("hidden");
+      showPanelBtn.classList.remove("visible");
+    }
+
+    langToggleBtn.addEventListener("click", toggleLanguage);
+    hidePanelBtn.addEventListener("click", hideControlPanel);
+    showPanelBtn.addEventListener("click", showControlPanel);
+    pickMp3Btn.addEventListener("click", openMp3Picker);
+    pickBgBtn.addEventListener("click", openBgPicker);
+    pickIconBtn.addEventListener("click", openIconPicker);
+    applyConfigBtn.addEventListener("click", applyConfig);
+    startBtn.addEventListener("click", startPlayback);
+    pauseBtn.addEventListener("click", pausePlayback);
+
+    mp3Input.addEventListener("change", onMp3Selected);
+    bgInput.addEventListener("change", onBgSelected);
+    iconInput.addEventListener("change", onIconSelected);
+    opacitySlider.addEventListener("input", setDiscOpacityFromSlider);
+
+    window.addEventListener("resize", resize);
+    window.addEventListener("pointerdown", ensureAudioContextRunning, { passive: true });
+    window.addEventListener("keydown", ensureAudioContextRunning);
+
+    resize();
+    setDiscOpacityFromSlider();
+    applyLanguage();
+    updateConfigState();
+    requestAnimationFrame(drawMusicRing);
+  </script>
+</body>
+</html>
