@@ -31,7 +31,7 @@ A browser-based MP3 visual player with a centered rotating disc, circular colorf
 ## Quick Start
 
 1. Clone this repository.
-2. Open `html/ball.html` in your browser.
+2. Open `html/HTML-MusicPlayer-Zh-cn.html` in your browser.
 3. Recommended browsers: Chrome / Edge (latest).
 
 No build tools or dependencies are required.
@@ -57,4 +57,5 @@ No build tools or dependencies are required.
 ## License
 
 Add your preferred license (for example, MIT).
+
 
